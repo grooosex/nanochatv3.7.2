@@ -978,7 +978,7 @@ export function CustomPromptModal() {
     <Modal open onClose={() => setUI({ customPrompt: null })} title="自定义修改提示词">
       <button
         type="button"
-        className="mb-3 block text-left text-[13px] font-medium leading-5 text-primary"
+        className="-mt-1 mb-3 inline-flex h-7 items-center rounded-full border border-line bg-card px-3 text-[13px] font-medium leading-none text-primary"
         onClick={() => applyChatImageToPure(chat, text, charTails, live, insert)}
       >
         应用到纯生图

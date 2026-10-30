@@ -404,12 +404,13 @@ export function wechatPresetStyle(
   const texts = presetTexts(preset, readMode(settings));
   const sys = substituteMacros(texts.systemPrompt, ctx).trim();
   const post = substituteMacros(texts.postHistory, ctx).trim();
-  const closer = group
+  const lengthNote = "预设里的最低字数不要用在微信上。气泡仍是一句，通常不超过 40 个字。内心四到八句就停。";
+  const closer = (group
     ? "上面的预设只影响她们怎么说、什么态度，不能改输出形式。最终只能返回一个 JSON，不要 markdown，不要小说，不要状态栏，不要预设自己的消息格式。bubbles 是数组，每项是 {name, text}。inner 和 sticker 按角色名分开。思考不要写进 text 或 inner。bubbles 的先后就是发出顺序。后一条已经看见前一条，不要把每个人写成同时只回用户。" +
       (inlineImage ? "JSON 结束后另起一行写 <<<PROMPT>>>，里面只许英文 tag，然后 <<<END>>>。" : "")
     : inlineImage
       ? "上面的预设只影响她怎么说、什么态度，不能改输出形式。先只输出一个微信 JSON，不要 markdown，不要小说，不要状态栏，不要预设自己的消息格式。思考不要写进 bubbles 或 inner。JSON 结束后另起一行写 <<<PROMPT>>>，里面只许英文 tag，然后 <<<END>>>。"
-      : '上面的预设只影响她怎么说、什么态度，不能改输出形式。最终只能返回一个 JSON，不要 markdown，不要解释，不要小说，不要状态栏，不要预设自己的消息格式：{"bubbles":["一条文字"],"inner":"内心","sticker":0}。思考过程不要写进 bubbles 或 inner。';
+      : '上面的预设只影响她怎么说、什么态度，不能改输出形式。最终只能返回一个 JSON，不要 markdown，不要解释，不要小说，不要状态栏，不要预设自己的消息格式：{"bubbles":["一条文字"],"inner":"内心","sticker":0}。思考过程不要写进 bubbles 或 inner。') + lengthNote;
   return {
     styleExtra: sys || undefined,
     postHistory: [post, closer].filter(Boolean).join("\n\n"),

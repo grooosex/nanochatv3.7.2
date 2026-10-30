@@ -327,7 +327,17 @@ export function ParamsPane({ chat, mode = "chat" }: { chat: Chat; mode?: "chat" 
           </div>
           <PromptBox value={p.promptMid} suggest={p.tagSuggest} minH={208} onChange={(v) => patch({ promptMid: v })} />
 
-          <div className="mb-1 mt-3 text-[13px] font-medium">正面提示词.后</div>
+          <div className="mb-1 mt-3 flex items-center justify-between">
+            <div className="text-[13px] font-medium leading-5">正面提示词.后</div>
+            <button
+              type="button"
+              className="grid size-5 place-items-center text-danger"
+              aria-label="清空正面提示词中"
+              onClick={() => patch({ promptMid: "" })}
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
           <PromptBox value={p.promptBack} suggest={p.tagSuggest} minH={120} onChange={(v) => patch({ promptBack: v })} />
 
           {mode === "pure" && (

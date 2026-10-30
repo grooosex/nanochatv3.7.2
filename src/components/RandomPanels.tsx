@@ -913,26 +913,86 @@ function ItemEditor({
   );
 }
 
+function groupText(groups: string[][]) {
+  return groups.map((g) => g.join("&")).join(", ");
+}
+
+function groupRanges(groups: string[][]) {
+  const ranges: { start: number; end: number }[] = [];
+  let at = 0;
+  groups.forEach((g, i) => {
+    if (i > 0) at += 2;
+    const start = at;
+    at += g.join("&").length;
+    ranges.push({ start, end: at });
+  });
+  return ranges;
+}
+
+function hitGroups(groups: string[][], start: number, end: number, dir: "back" | "fwd") {
+  const ranges = groupRanges(groups);
+  if (!ranges.length) return [] as number[];
+  if (start !== end) {
+    return ranges.map((_, i) => i).filter((i) => ranges[i].end > start && ranges[i].start < end);
+  }
+  const caret = start;
+  if (dir === "back") {
+    for (let i = ranges.length - 1; i >= 0; i--) {
+      if (caret > ranges[i].start && caret <= ranges[i].end) return [i];
+      if (caret > ranges[i].end && (i === ranges.length - 1 || caret <= ranges[i + 1].start)) return [i];
+    }
+    return [];
+  }
+  for (let i = 0; i < ranges.length; i++) {
+    if (caret >= ranges[i].start && caret < ranges[i].end) return [i];
+    if (caret < ranges[i].start && (i === 0 || caret >= ranges[i - 1].end)) return [i];
+  }
+  return [];
+}
+
+function dropGroups(groups: string[][], indexes: number[]) {
+  if (!indexes.length) return { next: groups, caret: 0 };
+  const gone = new Set(indexes);
+  const ranges = groupRanges(groups);
+  const first = Math.min(...indexes);
+  let prev = first - 1;
+  while (prev >= 0 && gone.has(prev)) prev--;
+  return {
+    next: groups.filter((_, i) => !gone.has(i)),
+    caret: prev >= 0 ? ranges[prev].end : 0,
+  };
+}
+
 function QuickPick({ modules, onInsert }: { modules: RandomModule[]; onInsert: (piece: string) => void }) {
   const [picked, setPicked] = useState<string[]>([]);
   const [groups, setGroups] = useState<string[][]>([]);
-  const [cursor, setCursor] = useState(0);
+  const boxRef = useRef<HTMLTextAreaElement>(null);
+  const caretRef = useRef<number | null>(null);
+  const delAt = useRef(0);
   const toggle = (name: string) => setPicked((cur) => (cur.includes(name) ? cur.filter((n) => n !== name) : [...cur, name]));
   const confirm = () => {
     if (!picked.length) return;
-    setGroups((cur) => {
-      const next = [...cur, picked];
-      setCursor(next.length);
-      return next;
-    });
+    setGroups((cur) => [...cur, picked]);
     setPicked([]);
   };
-  const removeAt = (index: number) => {
-    setGroups((cur) => {
-      const next = cur.filter((_, i) => i !== index);
-      setCursor((c) => Math.max(0, Math.min(c > index ? c - 1 : c, next.length)));
-      return next;
-    });
+  useEffect(() => {
+    const el = boxRef.current;
+    const n = caretRef.current;
+    if (!el || n == null) return;
+    caretRef.current = null;
+    el.setSelectionRange(n, n);
+  }, [groups]);
+  const cut = (dir: "back" | "fwd") => {
+    const now = Date.now();
+    if (now - delAt.current < 40) return;
+    delAt.current = now;
+    const el = boxRef.current;
+    if (!el || !groups.length) return;
+    const indexes = hitGroups(groups, el.selectionStart, el.selectionEnd, dir);
+    if (!indexes.length) return;
+    const dropped = dropGroups(groups, indexes);
+    caretRef.current = dropped.caret;
+    setGroups(dropped.next);
   };
   return (
     <div>
@@ -969,42 +1029,36 @@ function QuickPick({ modules, onInsert }: { modules: RandomModule[]; onInsert: (
               return;
             }
             onInsert(groups.map((g) => moduleTag(g)).join(","));
+            caretRef.current = 0;
+            setGroups([]);
             useApp.getState().toast("输出成功");
           }}
         >
           输出
         </button>
       </div>
-      <div
-        tabIndex={0}
-        className="min-h-28 whitespace-pre-wrap rounded-[16px] border border-line bg-card px-3 py-3 text-[14px] outline-none focus:border-primary/40"
+      <textarea
+        ref={boxRef}
+        value={groupText(groups)}
+        placeholder="点确定后出现在这里。退格删掉一整组。"
+        className="min-h-28 w-full resize-none rounded-[16px] border border-line bg-card px-3 py-3 text-[14px] outline-none placeholder:text-muted focus:border-primary/40"
+        onChange={() => undefined}
+        onPaste={(e) => e.preventDefault()}
         onKeyDown={(e) => {
           if (e.key !== "Backspace" && e.key !== "Delete") return;
           e.preventDefault();
-          if (!groups.length) return;
-          if (e.key === "Backspace") {
-            if (cursor <= 0) return;
-            removeAt(cursor - 1);
+          cut(e.key === "Backspace" ? "back" : "fwd");
+        }}
+        onBeforeInput={(e) => {
+          const kind = (e.nativeEvent as InputEvent).inputType || "";
+          if (kind === "deleteContentBackward" || kind === "deleteContentForward" || kind === "deleteByCut") {
+            e.preventDefault();
+            cut(kind === "deleteContentForward" ? "fwd" : "back");
             return;
           }
-          if (cursor >= groups.length) return;
-          removeAt(cursor);
+          e.preventDefault();
         }}
-      >
-        {groups.length === 0 && <span className="text-muted">点确定后出现在这里。退格删掉一整组。</span>}
-        {groups.map((g, i) => (
-          <span key={`${g.join("&")}-${i}`}>
-            {i > 0 ? ", " : ""}
-            <button
-              type="button"
-              className={cursor === i + 1 ? "underline decoration-primary" : ""}
-              onClick={() => setCursor(i + 1)}
-            >
-              {g.join("&")}
-            </button>
-          </span>
-        ))}
-      </div>
+      />
     </div>
   );
 }
